@@ -1,0 +1,26 @@
+{
+  "name": "@jobslave/job-scrapers",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "types": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@jobslave/shared": "workspace:*",
+    "@jobslave/llm-client": "workspace:*",
+    "playwright": "^1.50.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
