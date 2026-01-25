@@ -66,6 +66,9 @@ export abstract class BaseScraper {
     this.page = await this.context.newPage();
     this.page.setDefaultTimeout(this.config.timeout);
 
+    // Navigate to the base URL on initialization
+    await this.page.goto(this.baseUrl, { waitUntil: 'domcontentloaded' });
+
     this.log('info', 'Browser initialized');
   }
 

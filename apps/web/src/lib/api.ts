@@ -19,6 +19,25 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
   return response.json();
 }
 
+// Parsed resume type
+export interface ParsedResume {
+  name?: string;
+  email?: string;
+  phone?: string;
+  currentTitle?: string;
+  totalExperience?: number;
+  skills?: string[];
+  education?: Array<{ degree: string; institution: string; year?: number }>;
+  experience?: Array<{ title: string; company: string; duration: string; description?: string }>;
+  summary?: string;
+  preferredTitles?: string[];
+  preferredLocations?: string[];
+  expectedCTC?: string;
+  noticePeriod?: string;
+  resumePath?: string;
+  message?: string;
+}
+
 // Profile API
 export const profileApi = {
   get: () => fetchApi<UserProfile | null>('/profile'),
@@ -34,6 +53,21 @@ export const profileApi = {
     return response.json();
   },
   deleteResume: () => fetchApi('/profile/resume', { method: 'DELETE' }),
+  parseResume: async (file: File): Promise<ParsedResume> => {
+    const formData = new FormData();
+    formData.append('resume', file);
+    const response = await fetch(`${API_BASE}/profile/parse-resume`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Parse failed' }));
+      throw new Error(error.error || 'Parse failed');
+    }
+    return response.json();
+  },
+  suggestTitles: (data: { currentTitle: string; totalExperience?: number; skills?: string[] }) =>
+    fetchApi<{ titles: string[] }>('/profile/suggest-titles', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // Jobs API

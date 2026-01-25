@@ -8,21 +8,21 @@ const router = Router();
 
 const settingsSchema = z.object({
   llm: z.object({
-    baseUrl: z.string().url(),
-    selectedModel: z.string(),
-    temperature: z.number().min(0).max(2),
-    maxTokens: z.number().min(1).max(8192),
+    baseUrl: z.string().url().optional(),
+    selectedModel: z.string().optional(),
+    temperature: z.number().min(0).max(2).optional(),
+    maxTokens: z.number().min(1).max(8192).optional(),
   }).optional(),
   automation: z.object({
-    delayBetweenApplications: z.number().min(1000),
-    maxApplicationsPerSession: z.number().min(1).max(200),
-    headless: z.boolean(),
-    retryOnFailure: z.boolean(),
-    maxRetries: z.number().min(0).max(10),
+    delayBetweenApplications: z.number().min(1000).optional(),
+    maxApplicationsPerSession: z.number().min(1).max(200).optional(),
+    headless: z.boolean().optional(),
+    retryOnFailure: z.boolean().optional(),
+    maxRetries: z.number().min(0).max(10).optional(),
   }).optional(),
   notifications: z.object({
-    soundEnabled: z.boolean(),
-    desktopNotifications: z.boolean(),
+    soundEnabled: z.boolean().optional(),
+    desktopNotifications: z.boolean().optional(),
   }).optional(),
 });
 
@@ -78,23 +78,23 @@ router.patch('/', async (req, res) => {
     };
 
     if (data.llm) {
-      updates.llmBaseUrl = data.llm.baseUrl;
-      updates.llmModel = data.llm.selectedModel;
-      updates.llmTemperature = data.llm.temperature;
-      updates.llmMaxTokens = data.llm.maxTokens;
+      if (data.llm.baseUrl !== undefined) updates.llmBaseUrl = data.llm.baseUrl;
+      if (data.llm.selectedModel !== undefined) updates.llmModel = data.llm.selectedModel;
+      if (data.llm.temperature !== undefined) updates.llmTemperature = data.llm.temperature;
+      if (data.llm.maxTokens !== undefined) updates.llmMaxTokens = data.llm.maxTokens;
     }
 
     if (data.automation) {
-      updates.automationDelay = data.automation.delayBetweenApplications;
-      updates.automationMaxPerSession = data.automation.maxApplicationsPerSession;
-      updates.automationHeadless = data.automation.headless;
-      updates.automationRetry = data.automation.retryOnFailure;
-      updates.automationMaxRetries = data.automation.maxRetries;
+      if (data.automation.delayBetweenApplications !== undefined) updates.automationDelay = data.automation.delayBetweenApplications;
+      if (data.automation.maxApplicationsPerSession !== undefined) updates.automationMaxPerSession = data.automation.maxApplicationsPerSession;
+      if (data.automation.headless !== undefined) updates.automationHeadless = data.automation.headless;
+      if (data.automation.retryOnFailure !== undefined) updates.automationRetry = data.automation.retryOnFailure;
+      if (data.automation.maxRetries !== undefined) updates.automationMaxRetries = data.automation.maxRetries;
     }
 
     if (data.notifications) {
-      updates.notificationsSound = data.notifications.soundEnabled;
-      updates.notificationsDesktop = data.notifications.desktopNotifications;
+      if (data.notifications.soundEnabled !== undefined) updates.notificationsSound = data.notifications.soundEnabled;
+      if (data.notifications.desktopNotifications !== undefined) updates.notificationsDesktop = data.notifications.desktopNotifications;
     }
 
     await db

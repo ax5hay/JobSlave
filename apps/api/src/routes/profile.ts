@@ -4,9 +4,15 @@ import { z } from 'zod';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { createRequire } from 'module';
 
 import { getDb, schema } from '../db';
 import { generateId } from '@jobslave/shared';
+import { LMStudioClient, ResumeParserService } from '@jobslave/llm-client';
+
+// pdf-parse v1.x is a CJS module that exports a function directly
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
 const router = Router();
 
@@ -212,6 +218,87 @@ router.delete('/resume', async (req, res) => {
   } catch (error) {
     console.error('Delete resume error:', error);
     res.status(500).json({ error: 'Failed to delete resume' });
+  }
+});
+
+// Parse resume with LLM - extracts all profile data
+router.post('/parse-resume', upload.single('resume'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    // Get LLM settings
+    const db = getDb();
+    const settings = await db.select().from(schema.settings).limit(1);
+    const baseUrl = settings[0]?.llmBaseUrl || 'http://127.0.0.1:1234';
+    const model = settings[0]?.llmModel || undefined;
+
+    // Extract text from PDF
+    let resumeText = '';
+    const ext = path.extname(req.file.originalname).toLowerCase();
+
+    if (ext === '.pdf') {
+      const dataBuffer = fs.readFileSync(req.file.path);
+      const pdfData = await pdfParse(dataBuffer);
+      resumeText = pdfData.text;
+    } else {
+      // For DOC/DOCX, we'll just read as text (basic support)
+      // In production, you'd use a proper DOCX parser
+      resumeText = fs.readFileSync(req.file.path, 'utf-8');
+    }
+
+    if (!resumeText || resumeText.trim().length < 50) {
+      return res.status(400).json({ error: 'Could not extract text from resume. Please ensure the PDF is not scanned/image-based.' });
+    }
+
+    // Parse with LLM
+    const client = new LMStudioClient({ baseUrl, model });
+    const parser = new ResumeParserService(client);
+    const parsedProfile = await parser.parseResume(resumeText);
+
+    // Save the resume file path
+    const resumePath = req.file.path;
+
+    // Return parsed data (don't save yet - let user review)
+    res.json({
+      ...parsedProfile,
+      resumePath,
+      message: 'Resume parsed successfully. Review and save your profile.',
+    });
+  } catch (error: any) {
+    console.error('Parse resume error:', error);
+    res.status(500).json({ error: error.message || 'Failed to parse resume' });
+  }
+});
+
+// Get job title suggestions based on profile
+router.post('/suggest-titles', async (req, res) => {
+  try {
+    const { currentTitle, totalExperience, skills } = req.body;
+
+    if (!currentTitle) {
+      return res.status(400).json({ error: 'Current title is required' });
+    }
+
+    const db = getDb();
+    const settings = await db.select().from(schema.settings).limit(1);
+    const baseUrl = settings[0]?.llmBaseUrl || 'http://127.0.0.1:1234';
+    const model = settings[0]?.llmModel || undefined;
+
+    const client = new LMStudioClient({ baseUrl, model });
+    const parser = new ResumeParserService(client);
+
+    const titles = await parser.suggestJobTitles({
+      currentTitle,
+      totalExperience: totalExperience || 0,
+      skills: skills || [],
+    });
+
+    res.json({ titles });
+  } catch (error: any) {
+    console.error('Suggest titles error:', error);
+    res.status(500).json({ error: error.message || 'Failed to suggest titles' });
   }
 });
 
