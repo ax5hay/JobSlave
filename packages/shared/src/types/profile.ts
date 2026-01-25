@@ -22,8 +22,8 @@ export interface UserProfile {
   keywords: string[];
 
   // Compensation
-  currentCTC?: number; // in LPA
-  expectedCTC?: number; // in LPA
+  currentCtc?: number; // in LPA
+  expectedCtc?: number; // in LPA
   noticePeriod: NoticePeriod;
 
   // Availability

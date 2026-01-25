@@ -250,13 +250,13 @@ export default function Jobs() {
         )}
 
         {/* Saved Jobs */}
-        {savedJobsData?.jobs?.length > 0 && searchResults.length === 0 && (
+        {savedJobsData && savedJobsData.jobs && savedJobsData.jobs.length > 0 && searchResults.length === 0 && (
           <div className="card">
             <h2 className="text-xl font-semibold mb-4">
               Previously Found Jobs ({savedJobsData.jobs.length})
             </h2>
             <div className="space-y-3">
-              {savedJobsData.jobs.slice(0, 20).map((job: Job) => (
+              {savedJobsData.jobs.slice(0, 20).map((job) => (
                 <JobCard key={job.id} job={job} />
               ))}
             </div>

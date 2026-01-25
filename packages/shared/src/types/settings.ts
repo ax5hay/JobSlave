@@ -37,7 +37,7 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   llm: {
-    baseUrl: 'http://localhost:1234',
+    baseUrl: 'http://127.0.0.1:1234',
     selectedModel: '',
     temperature: 0.7,
     maxTokens: 1024,

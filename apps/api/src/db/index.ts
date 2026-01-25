@@ -113,7 +113,7 @@ async function createTables(sqlite: Database.Database) {
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS settings (
       id TEXT PRIMARY KEY DEFAULT 'default',
-      llm_base_url TEXT NOT NULL DEFAULT 'http://localhost:1234',
+      llm_base_url TEXT NOT NULL DEFAULT 'http://127.0.0.1:1234',
       llm_model TEXT,
       llm_temperature REAL NOT NULL DEFAULT 0.7,
       llm_max_tokens INTEGER NOT NULL DEFAULT 1024,
