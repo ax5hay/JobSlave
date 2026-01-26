@@ -19,23 +19,40 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
   return response.json();
 }
 
-// Parsed resume type
+// Parsed resume type - matches backend ResumeParserService output
 export interface ParsedResume {
   name?: string;
   email?: string;
   phone?: string;
   currentTitle?: string;
   totalExperience?: number;
-  skills?: string[];
-  education?: Array<{ degree: string; institution: string; year?: number }>;
-  experience?: Array<{ title: string; company: string; duration: string; description?: string }>;
-  summary?: string;
+  currentCompany?: string;
+  skills?: Array<{ name: string; yearsOfExperience: number; proficiency: string }>;
+  education?: Array<{ degree: string; institution: string; year: number; percentage?: number }>;
   preferredTitles?: string[];
   preferredLocations?: string[];
-  expectedCTC?: string;
+  keywords?: string[];
+  currentCtc?: number;
+  expectedCtc?: number;
   noticePeriod?: string;
+  immediateJoiner?: boolean;
+  willingToRelocate?: boolean;
+  preferredWorkMode?: string;
+  summary?: string;
   resumePath?: string;
+  rawText?: string;
   message?: string;
+}
+
+// Progress event types for SSE
+export interface ParseProgress {
+  type: 'progress' | 'result' | 'error';
+  stage?: 'ocr' | 'llm' | 'complete';
+  progress?: number;
+  message?: string;
+  currentPage?: number;
+  totalPages?: number;
+  data?: ParsedResume;
 }
 
 // Profile API
@@ -53,6 +70,59 @@ export const profileApi = {
     return response.json();
   },
   deleteResume: () => fetchApi('/profile/resume', { method: 'DELETE' }),
+  // Parse resume with progress callback (uses SSE)
+  parseResumeWithProgress: (
+    file: File,
+    onProgress: (event: ParseProgress) => void
+  ): Promise<ParsedResume> => {
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append('resume', file);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API_BASE}/profile/parse-resume`);
+      xhr.setRequestHeader('Accept', 'text/event-stream');
+
+      let buffer = '';
+
+      xhr.onprogress = () => {
+        const newData = xhr.responseText.substring(buffer.length);
+        buffer = xhr.responseText;
+
+        // Parse SSE events
+        const lines = newData.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event: ParseProgress = JSON.parse(line.substring(6));
+              onProgress(event);
+
+              if (event.type === 'result' && event.data) {
+                resolve(event.data);
+              } else if (event.type === 'error') {
+                reject(new Error(event.message || 'Parse failed'));
+              }
+            } catch (e) {
+              // Ignore parse errors for incomplete chunks
+            }
+          }
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.onabort = () => reject(new Error('Request aborted'));
+
+      xhr.onloadend = () => {
+        if (xhr.status >= 400) {
+          reject(new Error('Parse failed'));
+        }
+      };
+
+      xhr.send(formData);
+    });
+  },
+
+  // Simple parse without progress (fallback)
   parseResume: async (file: File): Promise<ParsedResume> => {
     const formData = new FormData();
     formData.append('resume', file);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -17,8 +17,10 @@ import {
   CheckCircle2,
   Loader2,
   AlertCircle,
+  FileSearch,
+  Brain,
 } from 'lucide-react';
-import { profileApi, type ParsedResume } from '@/lib/api';
+import { profileApi, type ParsedResume, type ParseProgress } from '@/lib/api';
 import type { UserProfile, Skill, Education, NoticePeriod, WorkMode } from '@jobslave/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -81,6 +83,8 @@ export default function Profile() {
 
   const [parsedData, setParsedData] = useState<ParsedResume | null>(null);
   const [showParsedPreview, setShowParsedPreview] = useState(false);
+  const [parseProgress, setParseProgress] = useState<ParseProgress | null>(null);
+  const [isParsing, setIsParsing] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -115,15 +119,26 @@ export default function Profile() {
     onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
   });
 
-  const parseResumeMutation = useMutation({
-    mutationFn: profileApi.parseResume,
-    onSuccess: (data) => {
-      setParsedData(data);
+  const handleParseWithProgress = useCallback(async (file: File) => {
+    setIsParsing(true);
+    setParseProgress({ type: 'progress', stage: 'ocr', progress: 0, message: 'Starting...' });
+
+    try {
+      const result = await profileApi.parseResumeWithProgress(file, (event) => {
+        setParseProgress(event);
+      });
+
+      setParsedData(result);
       setShowParsedPreview(true);
+      setParseProgress(null);
       toast({ title: 'Resume parsed!', description: 'Review the extracted data and apply it to your profile' });
-    },
-    onError: (error: Error) => toast({ title: 'Parse failed', description: error.message, variant: 'destructive' }),
-  });
+    } catch (error: any) {
+      toast({ title: 'Parse failed', description: error.message, variant: 'destructive' });
+      setParseProgress(null);
+    } finally {
+      setIsParsing(false);
+    }
+  }, [toast]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,24 +155,45 @@ export default function Profile() {
   const handleAIParseResume = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      parseResumeMutation.mutate(file);
+      handleParseWithProgress(file);
     }
   };
 
   const applyParsedData = () => {
     if (!parsedData) return;
 
-    const skills: Skill[] = (parsedData.skills || []).map((name) => ({
-      name,
-      yearsOfExperience: parsedData.totalExperience || 0,
-      proficiency: 'intermediate' as const,
+    // Skills come as objects from the backend with { name, yearsOfExperience, proficiency }
+    const skills: Skill[] = (parsedData.skills || []).map((skill) => ({
+      name: skill.name || '',
+      yearsOfExperience: skill.yearsOfExperience || 0,
+      proficiency: (skill.proficiency as Skill['proficiency']) || 'intermediate',
     }));
 
+    // Education comes as objects with { degree, institution, year, percentage? }
     const education: Education[] = (parsedData.education || []).map((edu) => ({
-      degree: edu.degree,
-      institution: edu.institution,
+      degree: edu.degree || '',
+      institution: edu.institution || '',
       year: edu.year || new Date().getFullYear(),
+      percentage: edu.percentage,
     }));
+
+    // Map notice period string to valid enum value
+    const noticePeriodMap: Record<string, NoticePeriod> = {
+      'immediate': 'immediate',
+      '15_days': '15_days',
+      '30_days': '30_days',
+      '60_days': '60_days',
+      '90_days': '90_days',
+      'more_than_90_days': 'more_than_90_days',
+    };
+
+    // Map work mode string to valid enum value
+    const workModeMap: Record<string, WorkMode> = {
+      'remote': 'remote',
+      'hybrid': 'hybrid',
+      'onsite': 'onsite',
+      'any': 'any',
+    };
 
     setFormData((prev) => ({
       ...prev,
@@ -165,12 +201,19 @@ export default function Profile() {
       email: parsedData.email || prev.email,
       phone: parsedData.phone || prev.phone,
       currentTitle: parsedData.currentTitle || prev.currentTitle,
-      totalExperience: parsedData.totalExperience || prev.totalExperience,
+      currentCompany: parsedData.currentCompany || prev.currentCompany,
+      totalExperience: parsedData.totalExperience ?? prev.totalExperience,
       skills: skills.length > 0 ? skills : prev.skills,
       education: education.length > 0 ? education : prev.education,
       preferredTitles: parsedData.preferredTitles || prev.preferredTitles,
       preferredLocations: parsedData.preferredLocations || prev.preferredLocations,
-      keywords: parsedData.skills || prev.keywords,
+      keywords: parsedData.keywords || prev.keywords,
+      currentCtc: parsedData.currentCtc ?? prev.currentCtc,
+      expectedCtc: parsedData.expectedCtc ?? prev.expectedCtc,
+      noticePeriod: parsedData.noticePeriod ? noticePeriodMap[parsedData.noticePeriod] || prev.noticePeriod : prev.noticePeriod,
+      immediateJoiner: parsedData.immediateJoiner ?? prev.immediateJoiner,
+      willingToRelocate: parsedData.willingToRelocate ?? prev.willingToRelocate,
+      preferredWorkMode: parsedData.preferredWorkMode ? workModeMap[parsedData.preferredWorkMode] || prev.preferredWorkMode : prev.preferredWorkMode,
       resumePath: parsedData.resumePath || prev.resumePath,
     }));
 
@@ -283,13 +326,13 @@ export default function Profile() {
                 <Button
                   type="button"
                   onClick={() => aiFileInputRef.current?.click()}
-                  disabled={parseResumeMutation.isPending}
+                  disabled={isParsing}
                   className="gap-2 glass-button"
                 >
-                  {parseResumeMutation.isPending ? (
+                  {isParsing ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Parsing with AI...
+                      Processing...
                     </>
                   ) : (
                     <>
@@ -301,13 +344,68 @@ export default function Profile() {
                 <input
                   ref={aiFileInputRef}
                   type="file"
-                  accept=".pdf"
+                  accept=".pdf,.doc,.docx"
                   className="hidden"
                   onChange={handleAIParseResume}
                   aria-label="Upload resume for AI parsing"
                 />
                 <span className="text-xs text-muted-foreground">or drag & drop</span>
               </div>
+
+              {/* Progress Bar */}
+              {isParsing && parseProgress && (
+                <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center",
+                      parseProgress.stage === 'ocr' ? "bg-amber-500/20 text-amber-500" :
+                      parseProgress.stage === 'llm' ? "bg-violet-500/20 text-violet-500" :
+                      "bg-emerald-500/20 text-emerald-500"
+                    )}>
+                      {parseProgress.stage === 'ocr' ? (
+                        <FileSearch className="w-4 h-4" />
+                      ) : parseProgress.stage === 'llm' ? (
+                        <Brain className="w-4 h-4" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{parseProgress.message}</p>
+                      {parseProgress.currentPage && parseProgress.totalPages && (
+                        <p className="text-xs text-muted-foreground">
+                          Page {parseProgress.currentPage} of {parseProgress.totalPages}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-sm font-mono text-muted-foreground">
+                      {parseProgress.progress}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-secondary/50 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all duration-500 ease-out",
+                        parseProgress.stage === 'ocr' ? "bg-gradient-to-r from-amber-500 to-orange-500" :
+                        parseProgress.stage === 'llm' ? "bg-gradient-to-r from-violet-500 to-purple-500" :
+                        "bg-gradient-to-r from-emerald-500 to-green-500"
+                      )}
+                      style={{ width: `${parseProgress.progress}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span className={parseProgress.stage === 'ocr' ? 'text-amber-500 font-medium' : ''}>
+                      Text Extraction
+                    </span>
+                    <span className={parseProgress.stage === 'llm' ? 'text-violet-500 font-medium' : ''}>
+                      AI Analysis
+                    </span>
+                    <span className={parseProgress.stage === 'complete' ? 'text-emerald-500 font-medium' : ''}>
+                      Complete
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -369,16 +467,36 @@ export default function Profile() {
               </div>
             )}
             {parsedData.skills && parsedData.skills.length > 0 && (
-              <div className="p-3 rounded-lg bg-secondary/50 col-span-2 md:col-span-1">
+              <div className="p-3 rounded-lg bg-secondary/50 col-span-2 md:col-span-3">
                 <p className="text-xs text-muted-foreground mb-1">Skills ({parsedData.skills.length})</p>
                 <div className="flex flex-wrap gap-1">
-                  {parsedData.skills.slice(0, 5).map((skill, i) => (
-                    <Badge key={i} variant="secondary" className="text-xs">{skill}</Badge>
+                  {parsedData.skills.slice(0, 8).map((skill, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs">
+                      {skill.name} ({skill.yearsOfExperience}y)
+                    </Badge>
                   ))}
-                  {parsedData.skills.length > 5 && (
-                    <Badge variant="secondary" className="text-xs">+{parsedData.skills.length - 5}</Badge>
+                  {parsedData.skills.length > 8 && (
+                    <Badge variant="secondary" className="text-xs">+{parsedData.skills.length - 8}</Badge>
                   )}
                 </div>
+              </div>
+            )}
+            {parsedData.currentCompany && (
+              <div className="p-3 rounded-lg bg-secondary/50">
+                <p className="text-xs text-muted-foreground">Current Company</p>
+                <p className="font-medium truncate">{parsedData.currentCompany}</p>
+              </div>
+            )}
+            {parsedData.noticePeriod && (
+              <div className="p-3 rounded-lg bg-secondary/50">
+                <p className="text-xs text-muted-foreground">Notice Period</p>
+                <p className="font-medium">{parsedData.noticePeriod.replace('_', ' ')}</p>
+              </div>
+            )}
+            {parsedData.preferredWorkMode && (
+              <div className="p-3 rounded-lg bg-secondary/50">
+                <p className="text-xs text-muted-foreground">Work Mode</p>
+                <p className="font-medium capitalize">{parsedData.preferredWorkMode}</p>
               </div>
             )}
           </div>
@@ -390,41 +508,41 @@ export default function Profile() {
         <Section icon={User} title="Basic Information">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Full Name *</Label>
+              <Label>Full Name</Label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="glass-input"
-                required
+                placeholder="John Doe"
               />
             </div>
             <div className="space-y-2">
-              <Label>Email *</Label>
+              <Label>Email</Label>
               <Input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="glass-input"
-                required
+                placeholder="john@example.com"
               />
             </div>
             <div className="space-y-2">
-              <Label>Phone *</Label>
+              <Label>Phone</Label>
               <Input
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 className="glass-input"
-                required
+                placeholder="+91 9876543210"
               />
             </div>
             <div className="space-y-2">
-              <Label>Current Title *</Label>
+              <Label>Current Title</Label>
               <Input
                 value={formData.currentTitle}
                 onChange={(e) => setFormData({ ...formData, currentTitle: e.target.value })}
                 className="glass-input"
-                required
+                placeholder="Senior Software Engineer"
               />
             </div>
             <div className="space-y-2">
@@ -433,18 +551,19 @@ export default function Profile() {
                 value={formData.currentCompany || ''}
                 onChange={(e) => setFormData({ ...formData, currentCompany: e.target.value })}
                 className="glass-input"
+                placeholder="Acme Inc."
               />
             </div>
             <div className="space-y-2">
-              <Label>Total Experience (years) *</Label>
+              <Label>Total Experience (years)</Label>
               <Input
                 type="number"
                 min="0"
                 step="0.5"
-                value={formData.totalExperience}
-                onChange={(e) => setFormData({ ...formData, totalExperience: parseFloat(e.target.value) })}
+                value={formData.totalExperience || ''}
+                onChange={(e) => setFormData({ ...formData, totalExperience: parseFloat(e.target.value) || 0 })}
                 className="glass-input"
-                required
+                placeholder="5"
               />
             </div>
           </div>

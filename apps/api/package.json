@@ -17,13 +17,17 @@
     "@jobslave/shared": "workspace:*",
     "@types/pdf-parse": "^1.1.5",
     "better-sqlite3": "^11.6.0",
+    "canvas": "^3.2.1",
     "cors": "^2.8.5",
     "drizzle-orm": "^0.37.0",
     "express": "^4.21.0",
     "helmet": "^8.0.0",
     "multer": "^1.4.5-lts.1",
     "pdf-parse": "1.1.1",
+    "pdfjs-dist": "^5.4.530",
+    "sharp": "^0.34.5",
     "socket.io": "^4.8.0",
+    "tesseract.js": "^7.0.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {

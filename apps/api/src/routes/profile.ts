@@ -4,15 +4,11 @@ import { z } from 'zod';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { createRequire } from 'module';
 
 import { getDb, schema } from '../db';
 import { generateId } from '@jobslave/shared';
 import { LMStudioClient, ResumeParserService } from '@jobslave/llm-client';
-
-// pdf-parse v1.x is a CJS module that exports a function directly
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+import { getOCRService, type OCRProgress } from '../services/ocr';
 
 const router = Router();
 
@@ -46,33 +42,34 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
 
+// All fields are optional to allow partial profile saves
 const profileSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email(),
-  phone: z.string().min(10),
-  currentTitle: z.string().min(1),
-  totalExperience: z.number().min(0),
+  name: z.string().optional().default(''),
+  email: z.string().optional().default(''),
+  phone: z.string().optional().default(''),
+  currentTitle: z.string().optional().default(''),
+  totalExperience: z.number().min(0).optional().default(0),
   currentCompany: z.string().optional(),
   skills: z.array(z.object({
     name: z.string(),
     yearsOfExperience: z.number(),
     proficiency: z.enum(['beginner', 'intermediate', 'advanced', 'expert']),
-  })),
+  })).optional().default([]),
   education: z.array(z.object({
     degree: z.string(),
     institution: z.string(),
     year: z.number(),
     percentage: z.number().optional(),
-  })),
-  preferredTitles: z.array(z.string()),
-  preferredLocations: z.array(z.string()),
-  keywords: z.array(z.string()),
+  })).optional().default([]),
+  preferredTitles: z.array(z.string()).optional().default([]),
+  preferredLocations: z.array(z.string()).optional().default([]),
+  keywords: z.array(z.string()).optional().default([]),
   currentCtc: z.number().optional(),
   expectedCtc: z.number().optional(),
-  noticePeriod: z.enum(['immediate', '15_days', '30_days', '60_days', '90_days', 'more_than_90_days']),
-  immediateJoiner: z.boolean(),
-  willingToRelocate: z.boolean(),
-  preferredWorkMode: z.enum(['remote', 'hybrid', 'onsite', 'any']),
+  noticePeriod: z.enum(['immediate', '15_days', '30_days', '60_days', '90_days', 'more_than_90_days']).optional().default('immediate'),
+  immediateJoiner: z.boolean().optional().default(false),
+  willingToRelocate: z.boolean().optional().default(false),
+  preferredWorkMode: z.enum(['remote', 'hybrid', 'onsite', 'any']).optional().default('any'),
 });
 
 // Get profile
@@ -221,51 +218,106 @@ router.delete('/resume', async (req, res) => {
   }
 });
 
-// Parse resume with LLM - extracts all profile data
+// Parse resume with OCR + LLM - extracts all profile data with progress streaming
 router.post('/parse-resume', upload.single('resume'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    // Get LLM settings
-    const db = getDb();
-    const settings = await db.select().from(schema.settings).limit(1);
-    const baseUrl = settings[0]?.llmBaseUrl || 'http://127.0.0.1:1234';
-    const model = settings[0]?.llmModel || undefined;
+    // Check if client wants SSE
+    const useSSE = req.headers.accept === 'text/event-stream';
 
-    // Extract text from PDF
-    let resumeText = '';
-    const ext = path.extname(req.file.originalname).toLowerCase();
+    if (useSSE) {
+      // Set up SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
 
-    if (ext === '.pdf') {
-      const dataBuffer = fs.readFileSync(req.file.path);
-      const pdfData = await pdfParse(dataBuffer);
-      resumeText = pdfData.text;
+      const sendProgress = (data: any) => {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      };
+
+      try {
+        // Get LLM settings
+        const db = getDb();
+        const settings = await db.select().from(schema.settings).limit(1);
+        const baseUrl = settings[0]?.llmBaseUrl || 'http://127.0.0.1:1234';
+        const model = settings[0]?.llmModel || undefined;
+
+        // Extract text using OCR service with progress
+        sendProgress({ type: 'progress', stage: 'ocr', progress: 0, message: 'Starting text extraction...' });
+
+        const ocrService = getOCRService();
+        const resumeText = await ocrService.extractText(req.file!.path, (progress: OCRProgress) => {
+          sendProgress({
+            type: 'progress',
+            stage: 'ocr',
+            progress: Math.round(progress.progress * 0.6), // OCR is 60% of total
+            message: progress.message,
+            currentPage: progress.currentPage,
+            totalPages: progress.totalPages,
+          });
+        });
+
+        if (!resumeText || resumeText.trim().length < 50) {
+          sendProgress({ type: 'error', message: 'Could not extract text from resume. Please ensure the PDF is readable.' });
+          res.end();
+          return;
+        }
+
+        // Parse with LLM
+        sendProgress({ type: 'progress', stage: 'llm', progress: 65, message: 'Analyzing resume with AI...' });
+
+        const client = new LMStudioClient({ baseUrl, model });
+        const parser = new ResumeParserService(client);
+
+        sendProgress({ type: 'progress', stage: 'llm', progress: 75, message: 'Extracting structured data...' });
+
+        const parsedProfile = await parser.parseResume(resumeText);
+
+        sendProgress({ type: 'progress', stage: 'complete', progress: 100, message: 'Resume parsed successfully!' });
+
+        // Send final result
+        sendProgress({
+          type: 'result',
+          data: {
+            ...parsedProfile,
+            resumePath: req.file!.path,
+            rawText: resumeText.substring(0, 500) + '...', // Preview of extracted text
+          },
+        });
+
+        res.end();
+      } catch (error: any) {
+        sendProgress({ type: 'error', message: error.message || 'Failed to parse resume' });
+        res.end();
+      }
     } else {
-      // For DOC/DOCX, we'll just read as text (basic support)
-      // In production, you'd use a proper DOCX parser
-      resumeText = fs.readFileSync(req.file.path, 'utf-8');
+      // Non-SSE fallback (regular JSON response)
+      const db = getDb();
+      const settings = await db.select().from(schema.settings).limit(1);
+      const baseUrl = settings[0]?.llmBaseUrl || 'http://127.0.0.1:1234';
+      const model = settings[0]?.llmModel || undefined;
+
+      const ocrService = getOCRService();
+      const resumeText = await ocrService.extractText(req.file.path);
+
+      if (!resumeText || resumeText.trim().length < 50) {
+        return res.status(400).json({ error: 'Could not extract text from resume.' });
+      }
+
+      const client = new LMStudioClient({ baseUrl, model });
+      const parser = new ResumeParserService(client);
+      const parsedProfile = await parser.parseResume(resumeText);
+
+      res.json({
+        ...parsedProfile,
+        resumePath: req.file.path,
+        message: 'Resume parsed successfully. Review and save your profile.',
+      });
     }
-
-    if (!resumeText || resumeText.trim().length < 50) {
-      return res.status(400).json({ error: 'Could not extract text from resume. Please ensure the PDF is not scanned/image-based.' });
-    }
-
-    // Parse with LLM
-    const client = new LMStudioClient({ baseUrl, model });
-    const parser = new ResumeParserService(client);
-    const parsedProfile = await parser.parseResume(resumeText);
-
-    // Save the resume file path
-    const resumePath = req.file.path;
-
-    // Return parsed data (don't save yet - let user review)
-    res.json({
-      ...parsedProfile,
-      resumePath,
-      message: 'Resume parsed successfully. Review and save your profile.',
-    });
   } catch (error: any) {
     console.error('Parse resume error:', error);
     res.status(500).json({ error: error.message || 'Failed to parse resume' });

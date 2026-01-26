@@ -4,91 +4,99 @@
 
 @layer base {
   :root {
-    /* Apple-inspired Liquid Glass Color Palette */
-    --background: 220 20% 97%;
-    --foreground: 220 15% 15%;
+    /* Modern Vibrant Color Palette - Inspired by Linear, Vercel, Raycast */
+    --background: 240 10% 98%;
+    --foreground: 240 10% 8%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 15% 15%;
+    --card-foreground: 240 10% 8%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 15% 15%;
+    --popover-foreground: 240 10% 8%;
 
-    --primary: 211 100% 50%;
+    /* Vibrant Coral/Orange Primary */
+    --primary: 12 90% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 15% 94%;
-    --secondary-foreground: 220 15% 25%;
+    --secondary: 240 6% 93%;
+    --secondary-foreground: 240 10% 20%;
 
-    --muted: 220 15% 94%;
-    --muted-foreground: 220 10% 50%;
+    --muted: 240 6% 93%;
+    --muted-foreground: 240 5% 46%;
 
-    --accent: 280 100% 70%;
+    /* Electric Teal Accent */
+    --accent: 174 72% 46%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 142 76% 36%;
+    /* Fresh Mint Success */
+    --success: 158 64% 45%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
+    /* Warm Amber Warning */
+    --warning: 32 95% 54%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 220 15% 90%;
-    --input: 220 15% 90%;
-    --ring: 211 100% 50%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 12 90% 58%;
 
-    --radius: 1rem;
+    --radius: 0.875rem;
 
-    /* Liquid Glass Variables */
-    --glass-bg: rgba(255, 255, 255, 0.65);
-    --glass-bg-strong: rgba(255, 255, 255, 0.85);
-    --glass-border: rgba(255, 255, 255, 0.5);
-    --glass-border-subtle: rgba(255, 255, 255, 0.2);
-    --glass-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
-    --glass-shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    --glass-glow: 0 0 40px rgba(99, 102, 241, 0.15);
-    --glass-inner-glow: inset 0 1px 1px rgba(255, 255, 255, 0.6);
+    /* Modern Glass Variables - Warmer tones */
+    --glass-bg: rgba(255, 255, 255, 0.72);
+    --glass-bg-strong: rgba(255, 255, 255, 0.88);
+    --glass-border: rgba(255, 255, 255, 0.6);
+    --glass-border-subtle: rgba(255, 255, 255, 0.25);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    --glass-shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.18);
+    --glass-glow: 0 0 40px rgba(236, 101, 75, 0.12);
+    --glass-inner-glow: inset 0 1px 1px rgba(255, 255, 255, 0.7);
   }
 
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 220 15% 95%;
+    /* Deep Space Dark Theme */
+    --background: 240 15% 6%;
+    --foreground: 240 10% 96%;
 
-    --card: 222 47% 10%;
-    --card-foreground: 220 15% 95%;
+    --card: 240 15% 9%;
+    --card-foreground: 240 10% 96%;
 
-    --popover: 222 47% 10%;
-    --popover-foreground: 220 15% 95%;
+    --popover: 240 15% 9%;
+    --popover-foreground: 240 10% 96%;
 
-    --primary: 211 100% 60%;
+    /* Vibrant Coral Primary (slightly brighter in dark) */
+    --primary: 12 85% 62%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 222 30% 16%;
-    --secondary-foreground: 220 15% 85%;
+    --secondary: 240 12% 14%;
+    --secondary-foreground: 240 10% 88%;
 
-    --muted: 222 30% 16%;
-    --muted-foreground: 220 10% 55%;
+    --muted: 240 12% 14%;
+    --muted-foreground: 240 6% 52%;
 
-    --accent: 280 100% 70%;
+    /* Electric Teal Accent */
+    --accent: 174 65% 52%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 222 30% 18%;
-    --input: 222 30% 18%;
-    --ring: 211 100% 60%;
+    --border: 240 12% 16%;
+    --input: 240 12% 16%;
+    --ring: 12 85% 62%;
 
-    --glass-bg: rgba(17, 24, 39, 0.75);
-    --glass-bg-strong: rgba(17, 24, 39, 0.9);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-border-subtle: rgba(255, 255, 255, 0.04);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    --glass-shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    --glass-glow: 0 0 40px rgba(99, 102, 241, 0.2);
-    --glass-inner-glow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    /* Dark Glass Variables */
+    --glass-bg: rgba(15, 17, 23, 0.78);
+    --glass-bg-strong: rgba(15, 17, 23, 0.92);
+    --glass-border: rgba(255, 255, 255, 0.06);
+    --glass-border-subtle: rgba(255, 255, 255, 0.03);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+    --glass-shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
+    --glass-glow: 0 0 40px rgba(236, 101, 75, 0.15);
+    --glass-inner-glow: inset 0 1px 1px rgba(255, 255, 255, 0.06);
   }
 
   * {
@@ -271,62 +279,78 @@
   .mesh-gradient {
     @apply fixed inset-0 -z-10;
     background:
-      radial-gradient(ellipse at 20% 20%, hsl(211, 100%, 95%) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 80%, hsl(280, 100%, 95%) 0%, transparent 50%),
-      radial-gradient(ellipse at 50% 50%, hsl(142, 100%, 95%) 0%, transparent 60%),
-      linear-gradient(180deg, hsl(220, 20%, 97%) 0%, hsl(220, 20%, 95%) 100%);
+      radial-gradient(ellipse at 15% 25%, hsl(12, 90%, 92%) 0%, transparent 45%),
+      radial-gradient(ellipse at 85% 75%, hsl(174, 72%, 90%) 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 60%, hsl(158, 64%, 92%) 0%, transparent 55%),
+      radial-gradient(ellipse at 70% 20%, hsl(32, 95%, 92%) 0%, transparent 40%),
+      linear-gradient(180deg, hsl(240, 10%, 98%) 0%, hsl(240, 8%, 96%) 100%);
   }
 
   .dark .mesh-gradient {
     background:
-      radial-gradient(ellipse at 20% 20%, hsl(211, 100%, 15%) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 80%, hsl(280, 100%, 12%) 0%, transparent 50%),
-      radial-gradient(ellipse at 50% 50%, hsl(142, 100%, 10%) 0%, transparent 60%),
-      linear-gradient(180deg, hsl(222, 47%, 6%) 0%, hsl(222, 47%, 4%) 100%);
+      radial-gradient(ellipse at 15% 25%, hsl(12, 80%, 12%) 0%, transparent 45%),
+      radial-gradient(ellipse at 85% 75%, hsl(174, 65%, 10%) 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 60%, hsl(158, 50%, 8%) 0%, transparent 55%),
+      radial-gradient(ellipse at 70% 20%, hsl(32, 70%, 10%) 0%, transparent 40%),
+      linear-gradient(180deg, hsl(240, 15%, 6%) 0%, hsl(240, 15%, 4%) 100%);
   }
 
-  /* Animated gradient orbs */
+  /* Animated gradient orbs - Coral, Teal, Mint, Amber */
   .orb-container {
     @apply fixed inset-0 -z-10 overflow-hidden pointer-events-none;
   }
 
   .orb {
     @apply absolute rounded-full;
-    filter: blur(80px);
-    animation: orb-float 25s ease-in-out infinite;
+    filter: blur(90px);
+    animation: orb-float 28s ease-in-out infinite;
   }
 
+  /* Coral orb - top left */
   .orb-1 {
-    @apply w-[600px] h-[600px];
-    background: radial-gradient(circle, hsl(211, 100%, 70%, 0.4) 0%, transparent 70%);
-    top: -20%;
-    left: -10%;
+    @apply w-[550px] h-[550px];
+    background: radial-gradient(circle, hsl(12, 90%, 65%, 0.35) 0%, hsl(20, 95%, 60%, 0.15) 50%, transparent 70%);
+    top: -18%;
+    left: -8%;
     animation-delay: 0s;
   }
 
+  /* Teal orb - bottom right */
   .orb-2 {
-    @apply w-[500px] h-[500px];
-    background: radial-gradient(circle, hsl(280, 100%, 70%, 0.35) 0%, transparent 70%);
-    bottom: -15%;
-    right: -10%;
-    animation-delay: -8s;
+    @apply w-[480px] h-[480px];
+    background: radial-gradient(circle, hsl(174, 72%, 55%, 0.32) 0%, hsl(180, 65%, 50%, 0.12) 50%, transparent 70%);
+    bottom: -12%;
+    right: -8%;
+    animation-delay: -9s;
   }
 
+  /* Mint orb - center */
   .orb-3 {
-    @apply w-[400px] h-[400px];
-    background: radial-gradient(circle, hsl(142, 76%, 60%, 0.3) 0%, transparent 70%);
-    top: 40%;
-    left: 30%;
-    animation-delay: -16s;
+    @apply w-[380px] h-[380px];
+    background: radial-gradient(circle, hsl(158, 64%, 55%, 0.28) 0%, hsl(165, 55%, 50%, 0.1) 50%, transparent 70%);
+    top: 42%;
+    left: 28%;
+    animation-delay: -18s;
   }
 
+  /* Amber orb - top right */
   .orb-4 {
-    @apply w-[300px] h-[300px];
-    background: radial-gradient(circle, hsl(38, 100%, 70%, 0.25) 0%, transparent 70%);
-    top: 20%;
-    right: 20%;
-    animation-delay: -4s;
-    animation-duration: 20s;
+    @apply w-[320px] h-[320px];
+    background: radial-gradient(circle, hsl(32, 95%, 60%, 0.25) 0%, hsl(38, 90%, 55%, 0.08) 50%, transparent 70%);
+    top: 15%;
+    right: 18%;
+    animation-delay: -5s;
+    animation-duration: 22s;
+  }
+
+  /* Fifth orb for extra depth - violet accent */
+  .orb-5 {
+    @apply w-[260px] h-[260px];
+    background: radial-gradient(circle, hsl(270, 60%, 65%, 0.2) 0%, transparent 70%);
+    bottom: 30%;
+    left: 15%;
+    animation-delay: -12s;
+    animation-duration: 30s;
   }
 
   @keyframes orb-float {

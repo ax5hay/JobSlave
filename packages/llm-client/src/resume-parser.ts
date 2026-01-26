@@ -22,50 +22,75 @@ export interface ParsedResume {
   summary?: string;
 }
 
-const RESUME_PARSE_PROMPT = `You are an expert resume parser and career advisor. Analyze the resume text below and extract structured information.
+// RAG-style structured extraction prompt for resume parsing
+const RESUME_PARSE_PROMPT = `You are an expert resume parser for an automated job application system. Your task is to extract structured information from the OCR-processed resume text below.
 
-IMPORTANT: Return ONLY valid JSON, no explanations or markdown.
+## CRITICAL INSTRUCTIONS
+- Return ONLY valid JSON - no markdown code blocks, no explanations
+- Extract EXACTLY what's in the resume - don't fabricate information
+- For missing fields, use sensible defaults or null as specified
+- Handle OCR errors gracefully (typos, merged words, formatting issues)
 
-Extract the following:
-1. name - Full name
-2. email - Email address
-3. phone - Phone number (normalize to 10 digits if possible)
-4. currentTitle - Current or most recent job title
-5. totalExperience - Total years of experience (number)
-6. currentCompany - Current or most recent company
-7. skills - Array of skills with:
-   - name: skill name
-   - yearsOfExperience: estimated years (number)
-   - proficiency: "beginner" | "intermediate" | "advanced" | "expert"
-8. education - Array of education with:
-   - degree: degree name
-   - institution: school/university name
-   - year: graduation year (number)
-9. preferredTitles - Array of 3-5 job titles this person should apply for (be creative, include variations like "Senior X", "Lead X", "X Engineer", "X Developer")
-10. preferredLocations - Array of preferred work locations (extract from resume or suggest top tech hubs in India if not mentioned)
-11. keywords - Array of 10-15 searchable keywords for job hunting (technologies, tools, domains)
-12. currentCtc - Current salary in LPA if mentioned (number or null)
-13. expectedCtc - Expected salary in LPA - estimate 20-40% higher than current if not mentioned (number or null)
-14. noticePeriod - One of: "immediate" | "15_days" | "30_days" | "60_days" | "90_days" | "more_than_90_days"
-15. immediateJoiner - boolean (true if notice period is immediate or serving)
-16. willingToRelocate - boolean (true if relocatable or remote-friendly)
-17. preferredWorkMode - One of: "remote" | "hybrid" | "onsite" | "any"
-18. summary - A 2-3 sentence professional summary
+## EXTRACTION SCHEMA
 
-For skills proficiency, use this logic:
-- 0-1 years: beginner
-- 1-3 years: intermediate
-- 3-5 years: advanced
-- 5+ years: expert
+{
+  "name": "string - Full legal name as it appears",
+  "email": "string - Primary email address",
+  "phone": "string - Phone number (normalize: remove spaces, keep country code if present)",
+  "currentTitle": "string - Most recent job title (exactly as stated)",
+  "totalExperience": "number - Total years of professional experience (calculate from work history)",
+  "currentCompany": "string|null - Current or most recent employer",
+  "skills": [
+    {
+      "name": "string - Technology/skill name",
+      "yearsOfExperience": "number - Years using this skill (estimate from context)",
+      "proficiency": "beginner|intermediate|advanced|expert"
+    }
+  ],
+  "education": [
+    {
+      "degree": "string - Degree name (e.g., B.Tech, MBA, M.Sc)",
+      "institution": "string - University/College name",
+      "year": "number - Graduation year (4 digits)",
+      "percentage": "number|null - CGPA or percentage if mentioned"
+    }
+  ],
+  "preferredTitles": ["string - 5-7 job titles matching their profile and seniority"],
+  "preferredLocations": ["string - Extract from resume or use major tech hubs"],
+  "keywords": ["string - 15-20 searchable terms: technologies, tools, frameworks, domains"],
+  "currentCtc": "number|null - Current salary in LPA (extract if mentioned)",
+  "expectedCtc": "number|null - Expected salary in LPA (estimate 25-40% hike if not mentioned)",
+  "noticePeriod": "immediate|15_days|30_days|60_days|90_days|more_than_90_days",
+  "immediateJoiner": "boolean - true if notice period is immediate or already serving",
+  "willingToRelocate": "boolean - true if mentioned or if 'any location' preference",
+  "preferredWorkMode": "remote|hybrid|onsite|any",
+  "summary": "string - 2-3 sentence professional summary highlighting key strengths"
+}
 
-For preferredTitles, think creatively about job titles that match their experience:
-- If they're a "Software Developer" with 5 years exp, suggest: ["Senior Software Engineer", "Software Developer", "Full Stack Developer", "Backend Engineer", "Tech Lead"]
-- Match the domain and seniority level
+## PROFICIENCY MAPPING
+- 0-1 years: "beginner"
+- 1-3 years: "intermediate"
+- 3-5 years: "advanced"
+- 5+ years: "expert"
 
-RESUME TEXT:
+## JOB TITLE SUGGESTIONS
+Generate titles based on experience level and domain:
+- Junior (0-2 yrs): "Junior X", "X Developer", "Associate X"
+- Mid (3-5 yrs): "X Developer", "X Engineer", "X Specialist"
+- Senior (5-8 yrs): "Senior X", "Lead X", "X Architect"
+- Expert (8+ yrs): "Principal X", "Staff X", "X Manager", "Director of X"
+
+Include variations: Developer, Engineer, Programmer, Specialist, Consultant
+
+## KEYWORD EXTRACTION
+Include: Programming languages, frameworks, databases, cloud platforms, tools, methodologies (Agile, Scrum), certifications, domain expertise (fintech, healthcare, e-commerce)
+
+## OCR TEXT TO PARSE:
+---
 {resume_text}
+---
 
-Return ONLY the JSON object:`;
+Return the JSON object now:`;
 
 const JOB_TITLE_SUGGESTION_PROMPT = `Based on this professional profile, suggest the best job titles to search for.
 
@@ -104,7 +129,7 @@ export class ResumeParserService {
       },
     ], {
       temperature: 0.3, // Low temperature for structured output
-      maxTokens: 4096,
+      max_tokens: 4096,
     });
 
     // Extract JSON from response
@@ -139,7 +164,7 @@ export class ResumeParserService {
       { role: 'user', content: prompt },
     ], {
       temperature: 0.5,
-      maxTokens: 500,
+      max_tokens: 500,
     });
 
     const content = response.choices[0]?.message?.content || '[]';
@@ -178,7 +203,7 @@ Return JSON with:
       { role: 'user', content: prompt },
     ], {
       temperature: 0.4,
-      maxTokens: 1000,
+      max_tokens: 1000,
     });
 
     const content = response.choices[0]?.message?.content || '{}';
