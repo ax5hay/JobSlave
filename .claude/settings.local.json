@@ -13,7 +13,8 @@
       "Bash(taskkill:*)",
       "Bash(taskkill /F /PID 183092)",
       "Bash(powershell -Command:*)",
-      "Bash(wmic process where \"commandline like ''%JobSlave%''\" call terminate)"
+      "Bash(wmic process where \"commandline like ''%JobSlave%''\" call terminate)",
+      "Bash(pnpm add:*)"
     ]
   }
 }

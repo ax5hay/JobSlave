@@ -9,6 +9,7 @@ import { getDb, schema } from '../db';
 import { generateId } from '@jobslave/shared';
 import { LMStudioClient, ResumeParserService } from '@jobslave/llm-client';
 import { getOCRService, type OCRProgress } from '../services/ocr';
+import { logger, startTimer, logError } from '../utils/logger';
 
 const router = Router();
 
@@ -16,6 +17,7 @@ const router = Router();
 const uploadsDir = path.join(process.cwd(), 'data', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
+  logger.app.info({ uploadsDir }, 'Created uploads directory');
 }
 
 const storage = multer.diskStorage({
@@ -24,7 +26,9 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    cb(null, `resume-${Date.now()}${ext}`);
+    const filename = `resume-${Date.now()}${ext}`;
+    logger.api.debug({ originalName: file.originalname, newName: filename }, 'Processing file upload');
+    cb(null, filename);
   },
 });
 
@@ -34,8 +38,10 @@ const upload = multer({
     const allowedTypes = ['.pdf', '.doc', '.docx'];
     const ext = path.extname(file.originalname).toLowerCase();
     if (allowedTypes.includes(ext)) {
+      logger.api.debug({ ext, originalName: file.originalname }, 'File type accepted');
       cb(null, true);
     } else {
+      logger.api.warn({ ext, originalName: file.originalname }, 'File type rejected');
       cb(new Error('Only PDF, DOC, and DOCX files are allowed'));
     }
   },
@@ -74,15 +80,22 @@ const profileSchema = z.object({
 
 // Get profile
 router.get('/', async (req, res) => {
+  const timer = startTimer('Get profile');
   try {
+    logger.api.debug('Fetching user profile');
     const db = getDb();
     const profiles = await db.select().from(schema.profiles).limit(1);
 
     if (profiles.length === 0) {
+      timer.end();
+      logger.api.debug('No profile found');
       return res.json(null);
     }
 
     const profile = profiles[0];
+    timer.end();
+    logger.api.info({ profileId: profile.id, name: profile.name }, 'Profile retrieved');
+
     res.json({
       ...profile,
       skills: JSON.parse(profile.skills),
@@ -92,16 +105,22 @@ router.get('/', async (req, res) => {
       keywords: JSON.parse(profile.keywords),
     });
   } catch (error) {
-    console.error('Get profile error:', error);
+    timer.end();
+    logError(logger.api, error, { action: 'get-profile' });
     res.status(500).json({ error: 'Failed to get profile' });
   }
 });
 
 // Create or update profile
 router.post('/', async (req, res) => {
+  const timer = startTimer('Save profile');
   try {
+    logger.api.debug({ bodyKeys: Object.keys(req.body) }, 'Processing profile save request');
+
     const validation = profileSchema.safeParse(req.body);
     if (!validation.success) {
+      timer.end();
+      logger.api.warn({ errors: validation.error.errors }, 'Profile validation failed');
       return res.status(400).json({ error: validation.error.errors });
     }
 
@@ -114,6 +133,7 @@ router.post('/', async (req, res) => {
 
     if (existing.length > 0) {
       // Update
+      logger.api.info({ profileId: existing[0].id, name: data.name }, 'Updating existing profile');
       await db
         .update(schema.profiles)
         .set({
@@ -130,10 +150,14 @@ router.post('/', async (req, res) => {
         })
         .where(eq(schema.profiles.id, existing[0].id));
 
+      timer.end();
+      logger.api.info({ profileId: existing[0].id }, '✅ Profile updated successfully');
       res.json({ id: existing[0].id, message: 'Profile updated' });
     } else {
       // Create
       const id = generateId();
+      logger.api.info({ profileId: id, name: data.name }, 'Creating new profile');
+
       await db.insert(schema.profiles).values({
         id,
         ...data,
@@ -149,25 +173,39 @@ router.post('/', async (req, res) => {
         updatedAt: now,
       });
 
+      timer.end();
+      logger.api.info({ profileId: id }, '✅ Profile created successfully');
       res.status(201).json({ id, message: 'Profile created' });
     }
   } catch (error) {
-    console.error('Save profile error:', error);
+    timer.end();
+    logError(logger.api, error, { action: 'save-profile' });
     res.status(500).json({ error: 'Failed to save profile' });
   }
 });
 
 // Upload resume
 router.post('/resume', upload.single('resume'), async (req, res) => {
+  const timer = startTimer('Resume upload');
   try {
     if (!req.file) {
+      timer.end();
+      logger.api.warn('Resume upload attempted without file');
       return res.status(400).json({ error: 'No file uploaded' });
     }
+
+    logger.api.info({
+      filename: req.file.filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    }, 'Processing resume upload');
 
     const db = getDb();
     const profiles = await db.select().from(schema.profiles).limit(1);
 
     if (profiles.length === 0) {
+      timer.end();
+      logger.api.warn('Resume upload attempted without existing profile');
       return res.status(400).json({ error: 'Create profile first' });
     }
 
@@ -181,26 +219,35 @@ router.post('/resume', upload.single('resume'), async (req, res) => {
       })
       .where(eq(schema.profiles.id, profiles[0].id));
 
+    timer.end();
+    logger.api.info({ resumePath, profileId: profiles[0].id }, '✅ Resume uploaded successfully');
     res.json({ resumePath, message: 'Resume uploaded' });
   } catch (error) {
-    console.error('Upload resume error:', error);
+    timer.end();
+    logError(logger.api, error, { action: 'upload-resume' });
     res.status(500).json({ error: 'Failed to upload resume' });
   }
 });
 
 // Delete resume
 router.delete('/resume', async (req, res) => {
+  const timer = startTimer('Delete resume');
   try {
+    logger.api.info('Processing resume delete request');
+
     const db = getDb();
     const profiles = await db.select().from(schema.profiles).limit(1);
 
     if (profiles.length === 0 || !profiles[0].resumePath) {
+      timer.end();
+      logger.api.warn('Resume delete attempted - no resume found');
       return res.status(404).json({ error: 'No resume found' });
     }
 
     // Delete file
     if (fs.existsSync(profiles[0].resumePath)) {
       fs.unlinkSync(profiles[0].resumePath);
+      logger.api.debug({ path: profiles[0].resumePath }, 'Deleted resume file from disk');
     }
 
     await db
@@ -211,22 +258,35 @@ router.delete('/resume', async (req, res) => {
       })
       .where(eq(schema.profiles.id, profiles[0].id));
 
+    timer.end();
+    logger.api.info({ profileId: profiles[0].id }, '✅ Resume deleted successfully');
     res.json({ message: 'Resume deleted' });
   } catch (error) {
-    console.error('Delete resume error:', error);
+    timer.end();
+    logError(logger.api, error, { action: 'delete-resume' });
     res.status(500).json({ error: 'Failed to delete resume' });
   }
 });
 
 // Parse resume with OCR + LLM - extracts all profile data with progress streaming
 router.post('/parse-resume', upload.single('resume'), async (req, res) => {
+  const timer = startTimer('Parse resume');
   try {
     if (!req.file) {
+      timer.end();
+      logger.api.warn('Parse resume attempted without file');
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    logger.api.info({
+      filename: req.file.filename,
+      size: req.file.size,
+      path: req.file.path
+    }, '📄 Starting resume parsing');
+
     // Check if client wants SSE
     const useSSE = req.headers.accept === 'text/event-stream';
+    logger.api.debug({ useSSE }, 'Response mode determined');
 
     if (useSSE) {
       // Set up SSE headers
@@ -234,9 +294,11 @@ router.post('/parse-resume', upload.single('resume'), async (req, res) => {
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
       res.flushHeaders();
+      logger.api.debug('SSE headers set');
 
       const sendProgress = (data: any) => {
         res.write(`data: ${JSON.stringify(data)}\n\n`);
+        logger.api.trace({ stage: data.stage, progress: data.progress }, 'SSE progress sent');
       };
 
       try {
@@ -246,11 +308,21 @@ router.post('/parse-resume', upload.single('resume'), async (req, res) => {
         const baseUrl = settings[0]?.llmBaseUrl || 'http://127.0.0.1:1234';
         const model = settings[0]?.llmModel || undefined;
 
+        logger.llm.debug({ baseUrl, model }, 'LLM configuration loaded for parsing');
+
         // Extract text using OCR service with progress
         sendProgress({ type: 'progress', stage: 'ocr', progress: 0, message: 'Starting text extraction...' });
+        logger.ocr.info('Starting OCR text extraction');
 
         const ocrService = getOCRService();
         const resumeText = await ocrService.extractText(req.file!.path, (progress: OCRProgress) => {
+          logger.ocr.debug({
+            stage: progress.stage,
+            progress: progress.progress,
+            currentPage: progress.currentPage,
+            totalPages: progress.totalPages
+          }, progress.message);
+
           sendProgress({
             type: 'progress',
             stage: 'ocr',
@@ -262,22 +334,33 @@ router.post('/parse-resume', upload.single('resume'), async (req, res) => {
         });
 
         if (!resumeText || resumeText.trim().length < 50) {
+          timer.end();
+          logger.ocr.error({ textLength: resumeText?.length || 0 }, 'Insufficient text extracted from resume');
           sendProgress({ type: 'error', message: 'Could not extract text from resume. Please ensure the PDF is readable.' });
           res.end();
           return;
         }
 
+        logger.ocr.info({ textLength: resumeText.length }, '✅ OCR complete - text extracted');
+
         // Parse with LLM
         sendProgress({ type: 'progress', stage: 'llm', progress: 65, message: 'Analyzing resume with AI...' });
+        logger.llm.info('Starting LLM resume analysis');
 
         const client = new LMStudioClient({ baseUrl, model });
         const parser = new ResumeParserService(client);
 
         sendProgress({ type: 'progress', stage: 'llm', progress: 75, message: 'Extracting structured data...' });
 
-        console.log('[Resume Parse] Starting LLM parse with baseUrl:', baseUrl, 'model:', model);
+        logger.llm.debug({ baseUrl, model, textPreview: resumeText.substring(0, 200) }, 'Sending text to LLM for parsing');
         const parsedProfile = await parser.parseResume(resumeText);
-        console.log('[Resume Parse] LLM result:', JSON.stringify(parsedProfile, null, 2));
+
+        logger.llm.info({
+          name: parsedProfile.name,
+          email: parsedProfile.email,
+          skillsCount: parsedProfile.skills?.length,
+          educationCount: parsedProfile.education?.length
+        }, '✅ LLM parsing complete');
 
         sendProgress({ type: 'progress', stage: 'complete', progress: 100, message: 'Resume parsed successfully!' });
 
@@ -291,28 +374,43 @@ router.post('/parse-resume', upload.single('resume'), async (req, res) => {
           },
         });
 
+        timer.end();
+        logger.api.info({ name: parsedProfile.name }, '✅ Resume parsing complete via SSE');
         res.end();
       } catch (error: any) {
+        timer.end();
+        logError(logger.api, error, { action: 'parse-resume-sse' });
         sendProgress({ type: 'error', message: error.message || 'Failed to parse resume' });
         res.end();
       }
     } else {
       // Non-SSE fallback (regular JSON response)
+      logger.api.debug('Using non-SSE mode for resume parsing');
+
       const db = getDb();
       const settings = await db.select().from(schema.settings).limit(1);
       const baseUrl = settings[0]?.llmBaseUrl || 'http://127.0.0.1:1234';
       const model = settings[0]?.llmModel || undefined;
 
+      logger.ocr.info('Starting OCR text extraction (non-SSE mode)');
       const ocrService = getOCRService();
       const resumeText = await ocrService.extractText(req.file.path);
 
       if (!resumeText || resumeText.trim().length < 50) {
+        timer.end();
+        logger.ocr.error({ textLength: resumeText?.length || 0 }, 'Insufficient text extracted from resume');
         return res.status(400).json({ error: 'Could not extract text from resume.' });
       }
+
+      logger.ocr.info({ textLength: resumeText.length }, '✅ OCR complete');
+      logger.llm.info('Starting LLM resume analysis');
 
       const client = new LMStudioClient({ baseUrl, model });
       const parser = new ResumeParserService(client);
       const parsedProfile = await parser.parseResume(resumeText);
+
+      timer.end();
+      logger.api.info({ name: parsedProfile.name }, '✅ Resume parsing complete');
 
       res.json({
         ...parsedProfile,
@@ -321,19 +419,29 @@ router.post('/parse-resume', upload.single('resume'), async (req, res) => {
       });
     }
   } catch (error: any) {
-    console.error('Parse resume error:', error);
+    timer.end();
+    logError(logger.api, error, { action: 'parse-resume' });
     res.status(500).json({ error: error.message || 'Failed to parse resume' });
   }
 });
 
 // Get job title suggestions based on profile
 router.post('/suggest-titles', async (req, res) => {
+  const timer = startTimer('Suggest job titles');
   try {
     const { currentTitle, totalExperience, skills } = req.body;
 
     if (!currentTitle) {
+      timer.end();
+      logger.api.warn('Title suggestion attempted without current title');
       return res.status(400).json({ error: 'Current title is required' });
     }
+
+    logger.llm.info({
+      currentTitle,
+      totalExperience,
+      skillsCount: skills?.length
+    }, 'Generating job title suggestions');
 
     const db = getDb();
     const settings = await db.select().from(schema.settings).limit(1);
@@ -349,9 +457,12 @@ router.post('/suggest-titles', async (req, res) => {
       skills: skills || [],
     });
 
+    timer.end();
+    logger.llm.info({ suggestedCount: titles.length }, '✅ Job titles suggested');
     res.json({ titles });
   } catch (error: any) {
-    console.error('Suggest titles error:', error);
+    timer.end();
+    logError(logger.llm, error, { action: 'suggest-titles' });
     res.status(500).json({ error: error.message || 'Failed to suggest titles' });
   }
 });
