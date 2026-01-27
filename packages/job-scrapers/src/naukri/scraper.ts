@@ -20,15 +20,61 @@ export class NaukriScraper extends BaseScraper {
     }
 
     try {
-      await this.page.goto(this.baseUrl, { waitUntil: 'domcontentloaded' });
-      await delay(2000);
+      // Check current URL first - if we're on a logged-in page, that's a good indicator
+      const currentUrl = this.page.url();
 
-      // Check for login indicator (user menu or profile icon)
+      // If not on naukri, navigate there
+      if (!currentUrl.includes('naukri.com')) {
+        await this.page.goto(this.baseUrl, { waitUntil: 'domcontentloaded' });
+        await delay(2000);
+      }
+
+      // Check for login indicator (multiple selectors for robustness)
       const loggedIn = await this.page.evaluate(() => {
-        // Naukri shows different elements when logged in
-        const userMenu = document.querySelector('.nI-gNb-drawer__icon, .user-img, [data-ga-track="spa-event|header|Profile"]');
-        const loginBtn = document.querySelector('.nI-gNb-header__hamburger-icon-wrapper a[title="Login"]');
-        return userMenu !== null && loginBtn === null;
+        // Multiple ways to detect logged-in state on Naukri
+        const indicators = [
+          // User profile/menu elements (when logged in)
+          '.nI-gNb-drawer__icon',
+          '.user-img',
+          '.nI-gNb-sb__user',
+          '[data-ga-track*="Profile"]',
+          '.view-profile',
+          '.user-info',
+          'img[alt*="profile" i]',
+          '.nI-gNb-sb__user-info',
+          // My Naukri menu (only visible when logged in)
+          '[href*="/mnjuser/homepage"]',
+          '[href*="mnjuser"]',
+          '.nI-gNb-menu a[href*="mnjuser"]',
+        ];
+
+        // Login button selectors (present when NOT logged in)
+        const loginBtnSelectors = [
+          'a[title="Login"]',
+          'a[href*="/nlogin/login"]',
+          '.nI-gNb-header__hamburger-icon-wrapper a[title="Login"]',
+          'button:has-text("Login")',
+          '.login-btn',
+        ];
+
+        // Check if any logged-in indicator exists
+        const hasLoggedInIndicator = indicators.some(sel => {
+          try { return document.querySelector(sel) !== null; } catch { return false; }
+        });
+
+        // Check if login button is NOT present (if no login button, user is logged in)
+        const hasLoginBtn = loginBtnSelectors.some(sel => {
+          try { return document.querySelector(sel) !== null; } catch { return false; }
+        });
+
+        // Also check cookies for login session
+        const hasSessionCookie = document.cookie.includes('nauk_at') ||
+                                 document.cookie.includes('nauk_sid') ||
+                                 document.cookie.includes('NKWAP');
+
+        console.log('Login check:', { hasLoggedInIndicator, hasLoginBtn, hasSessionCookie });
+
+        return (hasLoggedInIndicator || hasSessionCookie) && !hasLoginBtn;
       });
 
       this.state.isLoggedIn = loggedIn;

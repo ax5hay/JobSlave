@@ -5,7 +5,15 @@
       "Bash(pnpm dev)",
       "Bash(pnpm turbo dev:*)",
       "Bash(curl:*)",
-      "Bash(pnpm exec playwright:*)"
+      "Bash(pnpm exec playwright:*)",
+      "Bash(tasklist:*)",
+      "Bash(wmic process where \"name=''node.exe''\" get WorkingSetSize)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(taskkill /F /PID 183092)",
+      "Bash(powershell -Command:*)",
+      "Bash(wmic process where \"commandline like ''%JobSlave%''\" call terminate)"
     ]
   }
 }
