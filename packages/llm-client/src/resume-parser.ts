@@ -23,74 +23,50 @@ export interface ParsedResume {
 }
 
 // RAG-style structured extraction prompt for resume parsing
-const RESUME_PARSE_PROMPT = `You are an expert resume parser for an automated job application system. Your task is to extract structured information from the OCR-processed resume text below.
+const RESUME_PARSE_PROMPT = `You are an expert resume parser. Extract information from the resume text and fill in the JSON template below.
 
-## CRITICAL INSTRUCTIONS
-- Return ONLY valid JSON - no markdown code blocks, no explanations
-- Extract EXACTLY what's in the resume - don't fabricate information
-- For missing fields, use sensible defaults or null as specified
-- Handle OCR errors gracefully (typos, merged words, formatting issues)
+CRITICAL: Return ONLY the filled JSON object. No markdown, no explanations, no code blocks.
 
-## EXTRACTION SCHEMA
+## RULES:
+1. Extract EXACTLY what's in the resume - don't invent information
+2. For skills: estimate yearsOfExperience based on work history dates
+3. Proficiency levels: 0-1 yrs="beginner", 1-3 yrs="intermediate", 3-5 yrs="advanced", 5+ yrs="expert"
+4. noticePeriod must be one of: "immediate", "15_days", "30_days", "60_days", "90_days", "more_than_90_days"
+5. preferredWorkMode must be one of: "remote", "hybrid", "onsite", "any"
+6. Generate 5-7 preferredTitles based on their experience and domain
+7. Generate 15-20 keywords (technologies, tools, frameworks, domains)
+8. Phone: keep only digits, max 10 characters
 
-{
-  "name": "string - Full legal name as it appears",
-  "email": "string - Primary email address",
-  "phone": "string - Phone number (normalize: remove spaces, keep country code if present)",
-  "currentTitle": "string - Most recent job title (exactly as stated)",
-  "totalExperience": "number - Total years of professional experience (calculate from work history)",
-  "currentCompany": "string|null - Current or most recent employer",
-  "skills": [
-    {
-      "name": "string - Technology/skill name",
-      "yearsOfExperience": "number - Years using this skill (estimate from context)",
-      "proficiency": "beginner|intermediate|advanced|expert"
-    }
-  ],
-  "education": [
-    {
-      "degree": "string - Degree name (e.g., B.Tech, MBA, M.Sc)",
-      "institution": "string - University/College name",
-      "year": "number - Graduation year (4 digits)",
-      "percentage": "number|null - CGPA or percentage if mentioned"
-    }
-  ],
-  "preferredTitles": ["string - 5-7 job titles matching their profile and seniority"],
-  "preferredLocations": ["string - Extract from resume or use major tech hubs"],
-  "keywords": ["string - 15-20 searchable terms: technologies, tools, frameworks, domains"],
-  "currentCtc": "number|null - Current salary in LPA (extract if mentioned)",
-  "expectedCtc": "number|null - Expected salary in LPA (estimate 25-40% hike if not mentioned)",
-  "noticePeriod": "immediate|15_days|30_days|60_days|90_days|more_than_90_days",
-  "immediateJoiner": "boolean - true if notice period is immediate or already serving",
-  "willingToRelocate": "boolean - true if mentioned or if 'any location' preference",
-  "preferredWorkMode": "remote|hybrid|onsite|any",
-  "summary": "string - 2-3 sentence professional summary highlighting key strengths"
-}
-
-## PROFICIENCY MAPPING
-- 0-1 years: "beginner"
-- 1-3 years: "intermediate"
-- 3-5 years: "advanced"
-- 5+ years: "expert"
-
-## JOB TITLE SUGGESTIONS
-Generate titles based on experience level and domain:
-- Junior (0-2 yrs): "Junior X", "X Developer", "Associate X"
-- Mid (3-5 yrs): "X Developer", "X Engineer", "X Specialist"
-- Senior (5-8 yrs): "Senior X", "Lead X", "X Architect"
-- Expert (8+ yrs): "Principal X", "Staff X", "X Manager", "Director of X"
-
-Include variations: Developer, Engineer, Programmer, Specialist, Consultant
-
-## KEYWORD EXTRACTION
-Include: Programming languages, frameworks, databases, cloud platforms, tools, methodologies (Agile, Scrum), certifications, domain expertise (fintech, healthcare, e-commerce)
-
-## OCR TEXT TO PARSE:
+## RESUME TEXT:
 ---
 {resume_text}
 ---
 
-Return the JSON object now:`;
+## FILL THIS JSON TEMPLATE (replace all values with extracted data):
+{
+  "name": "",
+  "email": "",
+  "phone": "",
+  "currentTitle": "",
+  "totalExperience": 0,
+  "currentCompany": null,
+  "skills": [
+    {"name": "", "yearsOfExperience": 0, "proficiency": "intermediate"}
+  ],
+  "education": [
+    {"degree": "", "institution": "", "year": 2020, "percentage": null}
+  ],
+  "preferredTitles": [],
+  "preferredLocations": [],
+  "keywords": [],
+  "currentCtc": null,
+  "expectedCtc": null,
+  "noticePeriod": "30_days",
+  "immediateJoiner": false,
+  "willingToRelocate": true,
+  "preferredWorkMode": "any",
+  "summary": ""
+}`;
 
 const JOB_TITLE_SUGGESTION_PROMPT = `Based on this professional profile, suggest the best job titles to search for.
 

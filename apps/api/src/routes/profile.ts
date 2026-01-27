@@ -275,7 +275,9 @@ router.post('/parse-resume', upload.single('resume'), async (req, res) => {
 
         sendProgress({ type: 'progress', stage: 'llm', progress: 75, message: 'Extracting structured data...' });
 
+        console.log('[Resume Parse] Starting LLM parse with baseUrl:', baseUrl, 'model:', model);
         const parsedProfile = await parser.parseResume(resumeText);
+        console.log('[Resume Parse] LLM result:', JSON.stringify(parsedProfile, null, 2));
 
         sendProgress({ type: 'progress', stage: 'complete', progress: 100, message: 'Resume parsed successfully!' });
 

@@ -5,10 +5,15 @@ import { createCanvas } from 'canvas';
 import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
 
 // ESM compatibility for require.resolve
 const require = createRequire(import.meta.url);
 const pdfjsDistPath = path.dirname(require.resolve('pdfjs-dist/package.json'));
+
+// Configure PDF.js worker for Node.js - point to the actual worker file
+const workerPath = path.join(pdfjsDistPath, 'legacy', 'build', 'pdf.worker.mjs');
+pdfjs.GlobalWorkerOptions.workerSrc = `file://${workerPath.replace(/\\/g, '/')}`;
 
 export interface OCRProgress {
   stage: 'loading' | 'converting' | 'ocr' | 'complete';
@@ -62,11 +67,13 @@ export class OCRService {
     // Read PDF file
     const data = new Uint8Array(fs.readFileSync(filePath));
 
-    // Load PDF document
+    // Load PDF document (disable worker for Node.js compatibility)
     const loadingTask = pdfjs.getDocument({
       data,
       useSystemFonts: true,
-      standardFontDataUrl: path.join(pdfjsDistPath, 'standard_fonts/'),
+      standardFontDataUrl: path.join(pdfjsDistPath, 'standard_fonts') + '/',
+      disableAutoFetch: true,
+      isEvalSupported: false,
     });
 
     const pdf = await loadingTask.promise;
