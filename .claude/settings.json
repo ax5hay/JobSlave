@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/Users/akshay/JobSlave/node_modules/.pnpm/electron@33.4.11/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron /Users/akshay/JobSlave/apps/desktop/out/main/index.js)"
+    ]
+  }
+}

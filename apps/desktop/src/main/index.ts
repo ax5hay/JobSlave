@@ -5,7 +5,8 @@ import { spawn, ChildProcess } from 'child_process';
 let mainWindow: BrowserWindow | null = null;
 let apiProcess: ChildProcess | null = null;
 
-const isDev = process.env.NODE_ENV === 'development';
+// Check if running in development mode via electron-vite
+const isDev = !app.isPackaged;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -18,6 +19,7 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      webSecurity: false, // Allow loading from localhost in dev
     },
   });
 
@@ -27,8 +29,12 @@ function createWindow(): void {
     return { action: 'deny' };
   });
 
-  if (isDev) {
-    // In development, load from Vite dev server
+  // Use electron-vite's environment variable for dev server URL
+  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
+    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
+    mainWindow.webContents.openDevTools();
+  } else if (isDev) {
+    // Fallback to checking common ports
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {

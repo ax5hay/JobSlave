@@ -1,36 +1,30 @@
-// Re-export from web app
-// In production, copy the web app build here
-// For now, this serves as a placeholder
-
+// Import the web app directly
+import '@/index.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { HashRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'react-hot-toast';
+import App from '@/App';
 
-function App() {
-  return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '100vh',
-      fontFamily: 'system-ui, sans-serif',
-      backgroundColor: '#f9fafb',
-    }}>
-      <h1 style={{ fontSize: '2rem', color: '#2563eb', marginBottom: '1rem' }}>
-        JobSlave
-      </h1>
-      <p style={{ color: '#6b7280' }}>
-        Loading application...
-      </p>
-      <p style={{ color: '#9ca3af', fontSize: '0.875rem', marginTop: '2rem' }}>
-        In development mode, please run <code>pnpm dev:web</code> and <code>pnpm dev:api</code> separately.
-      </p>
-    </div>
-  );
-}
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60, // 1 minute
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
+// Use HashRouter for Electron compatibility (file:// protocol)
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <QueryClientProvider client={queryClient}>
+      <HashRouter>
+        <App />
+        <Toaster position="bottom-right" />
+      </HashRouter>
+    </QueryClientProvider>
   </React.StrictMode>
 );
